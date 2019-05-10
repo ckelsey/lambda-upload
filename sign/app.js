@@ -1,8 +1,12 @@
+const REGION = process.env.REGION
 const https = require('https')
 const url = require('url')
 const AWS = require("aws-sdk")
-const s3 = new AWS.S3({})
-const EXPIRES = process.env.EXPIRES
+const s3 = new AWS.S3({
+    signatureVersion: 'v4',
+    region:REGION
+})
+const EXPIRES = parseInt(process.env.EXPIRES)
 const AUTHURL = process.env.AUTHURL
 const BUCKET = process.env.BUCKET
 const response = {
@@ -54,11 +58,11 @@ const ValidateUser = (userId, userToken) => {
 
 const GetS3Url = name => {
     return new Promise((resolve, reject) => {
-        const expiresIn = new Date().getTime() + (EXPIRES * 1000)
+        const expiresIn = new Date().getTime() + EXPIRES
         const params = {
             Bucket: BUCKET,
             Key: name,
-            Expires:EXPIRES,
+            Expires: EXPIRES / 1000,
             ContentType: `application/octet-stream`
         }
 

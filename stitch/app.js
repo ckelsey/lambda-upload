@@ -1,11 +1,16 @@
+const REGION = process.env.REGION
 const https = require('https')
 const url = require('url')
 const AWS = require("aws-sdk")
-const s3 = new AWS.S3({})
+const s3 = new AWS.S3({
+    signatureVersion: 'v4',
+    region:REGION
+})
 const AUTHURL = process.env.AUTHURL
 const TARGETBUCKET = process.env.TARGETBUCKET
 const SOURCEBUCKET = process.env.SOURCEBUCKET
 const CLEANUP = process.env.CLEANUP
+const FILENAME_DELINEATOR = process.env.FILENAME_DELINEATOR
 
 const getFileName = (path, ext) => {
     const split = getSourceKey(path).split(`_`)
@@ -13,7 +18,7 @@ const getFileName = (path, ext) => {
     return `${split.join(`_`)}.${ext}`
 }
 
-const getSourceKey = path => path.split(SOURCEBUCKET)[1]
+const getSourceKey = path => path.split(FILENAME_DELINEATOR)[1]
 
 const response = {
     statusCode: 200,
@@ -153,9 +158,10 @@ exports.handler = (event, context, callback) => {
     console.log(`SOURCEBUCKET`, SOURCEBUCKET)
     console.log(`AUTHURL`, AUTHURL)
     console.log(`BUCKET`, TARGETBUCKET)
+    console.log(`FILENAME_DELINEATOR`, FILENAME_DELINEATOR)
 
     const filename = getFileName(files[0], ext)
-    const Response = Object.assign({}, response, { body: `${TARGETBUCKET}${filename}` })
+    const RequestResponse = Object.assign({}, response, { body: `https://s3.${REGION}.amazonaws.com/${TARGETBUCKET}/${filename}` })
 
     return ValidateUser(userId, userToken)
         .then(data => {
@@ -164,12 +170,13 @@ exports.handler = (event, context, callback) => {
             return Promise.all(files.map(getS3File))
                 .then(buffers => putS3File(buffers, filename))
                 .then(() => {
+                    console.log(`Done with PUT, cleanup?`, CLEANUP)
                     if(!CLEANUP || CLEANUP === `false`){
-                        return callback(null, Response)
+                        return callback(null, RequestResponse)
                     }
 
                     return Promise.all(files.map(deleteS3File))
-                        .then(() => callback(null, Response))
+                        .then(() => callback(null, RequestResponse))
                         .catch(callback)
                 })
                 .catch(callback)
